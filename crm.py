@@ -4152,18 +4152,23 @@ with tab_dash:
         # Preparar datos para KPIs
         total_clientes = len(df_cli)
         estatus_counts = df_cli["estatus"].fillna("").value_counts()
-        
+
         # Calcular KPIs principales con lógica corregida
         dispersados = estatus_counts.get("DISPERSADO", 0)
-        
+
         # Clasificar automáticamente todos los estatus que empiecen con "RECH" como rechazados
         rechazados = sum([
-            count for estatus, count in estatus_counts.items() 
+            count for estatus, count in estatus_counts.items()
             if estatus and (estatus.startswith("RECH") or estatus.startswith("REC"))
         ])
-        
-        # EN PROCESO: Todo lo que NO sea DISPERSADO ni RECHAZADO
-        en_proceso = total_clientes - dispersados - rechazados
+
+        # === NUEVO: calcular propuestas (clientes con monto de propuesta) ===
+        analisis_tmp = calcular_analisis_financiero(df_cli)
+        total_propuestas = int(analisis_tmp.get('clientes_con_monto', 0))
+        dispersados_con_monto = int(analisis_tmp.get('dispersados_con_monto', 0))
+
+        # Propuestas que aún no se han dispersado
+        propuestas_no_dispersadas = max(0, total_propuestas - dispersados_con_monto)
         
         # Mostrar KPIs profesionales en columnas
         kpi1, kpi2, kpi3, kpi4 = st.columns(4)
@@ -4176,21 +4181,23 @@ with tab_dash:
             )
         
         with kpi2:
-            tasa_exito = (dispersados / total_clientes * 100) if total_clientes > 0 else 0
+            # Mostrar dispersados pero en relación a las propuestas (monto)
+            tasa_exito = (dispersados_con_monto / total_propuestas * 100) if total_propuestas > 0 else 0
             st.metric(
                 label="✅ Dispersados (Éxito)",
-                value=dispersados,
-                delta=f"{tasa_exito:.1f}% del total",
-                help="Clientes que han completado exitosamente el proceso"
+                value=dispersados_con_monto,
+                delta=f"{tasa_exito:.1f}% de propuestas",
+                help="Clientes dispersados considerando solo propuestas (monto)"
             )
-        
+
         with kpi3:
-            tasa_proceso = (en_proceso / total_clientes * 100) if total_clientes > 0 else 0
+            # Mostrar propuestas que aún no se han dispersado (no-dispersado / total propuestas)
+            tasa_proceso = (propuestas_no_dispersadas / total_propuestas * 100) if total_propuestas > 0 else 0
             st.metric(
-                label="⏳ En Proceso",
-                value=en_proceso,
-                delta=f"{tasa_proceso:.1f}% del total",
-                help="Clientes en onboarding, pendientes o en evaluación"
+                label="⏳ Propuestas no dispersadas",
+                value=propuestas_no_dispersadas,
+                delta=f"{tasa_proceso:.1f}% de propuestas",
+                help="Propuestas con monto que aún no se han dispersado (no-dispersado/total propuestas)"
             )
         
         with kpi4:
