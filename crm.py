@@ -713,10 +713,42 @@ def generar_presentacion_dashboard(df_cli: pd.DataFrame) -> bytes:
     import matplotlib
     matplotlib.use('Agg')  # Backend sin GUI
     
-    # Crear presentación
-    prs = Presentation()
-    prs.slide_width = Inches(10)
-    prs.slide_height = Inches(7.5)
+    # Crear presentación — intentar cargar plantilla .pptx si existe
+    from pathlib import Path as _Path
+
+    template_path = None
+    # Rutas recomendadas donde podrías haber subido la plantilla
+    candidates = [
+        Path("assets/presentation_template.pptx"),
+        Path("data/presentation_template.pptx")
+    ]
+    for c in candidates:
+        if c.exists():
+            template_path = c
+            break
+
+    # Si no hay plantilla en rutas conocidas, buscar el primer .pptx en el repo
+    if template_path is None:
+        repo_root = Path(__file__).parent
+        for p in repo_root.rglob("*.pptx"):
+            # evitar archivos temporales o la propia salida si existiera
+            if ".git" in str(p) or "site-packages" in str(p):
+                continue
+            template_path = p
+            break
+
+    try:
+        if template_path is not None:
+            prs = Presentation(str(template_path))
+        else:
+            prs = Presentation()
+            prs.slide_width = Inches(10)
+            prs.slide_height = Inches(7.5)
+    except Exception:
+        # Fallback: crear presentación vacía
+        prs = Presentation()
+        prs.slide_width = Inches(10)
+        prs.slide_height = Inches(7.5)
     
     # Calcular todas las métricas necesarias
     total_clientes = len(df_cli)
